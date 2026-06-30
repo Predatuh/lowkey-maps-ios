@@ -56,5 +56,11 @@
 	<string>Lowkey Maps shows your position on the jobsite map and navigates you to on-site equipment.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>Lowkey Maps shows your position on the jobsite map and navigates you to on-site equipment.</string>
+	<!-- file_picker references these APIs; strings are required even though the app uses
+	     the document picker, not the photo library / camera. -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Lowkey Maps lets you choose a jobsite map image to import.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Lowkey Maps can attach photos to locations on the map.</string>
 </dict>
 </plist>
