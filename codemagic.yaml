@@ -1,0 +1,62 @@
+# Codemagic CI/CD — builds Lowkey Maps for iOS in the cloud (no Mac needed) and
+# uploads it to TestFlight. See README_IOS_TESTFLIGHT.md for the one-time setup.
+#
+# Before the first run, in the Codemagic UI you must add:
+#   1) An App Store Connect API key integration (Teams/Personal → Integrations →
+#      App Store Connect). Note the integration name and put it under
+#      `app_store_connect:` below.
+#   2) Then set BUNDLE_ID / APP_STORE_APPLE_ID vars below.
+
+workflows:
+  ios-testflight:
+    name: iOS · TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 90
+    integrations:
+      app_store_connect: CodemagicASCKey   # <-- name of the API-key integration you create in Codemagic
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: app.lowkeymaps.lowkeyMaps   # <-- must match your App Store Connect app
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      vars:
+        APP_STORE_APPLE_ID: 0000000000   # <-- numeric "Apple ID" of the app from App Store Connect → App Information
+    scripts:
+      - name: Flutter packages
+        script: flutter pub get
+      - name: Set up provisioning (automatic via App Store Connect key)
+        script: xcode-project use-profiles
+      - name: Install CocoaPods
+        script: |
+          find . -name "Podfile" -execdir pod install \;
+      - name: Build signed IPA
+        script: |
+          flutter build ipa --release \
+            --export-options-plist=/Users/builder/export_options.plist
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - flutter_drive.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        # Optional: auto-add testers to a TestFlight group you created
+        # beta_groups:
+        #   - Field Crew
+
+  # Optional: also build the Android side here if you ever want one pipeline.
+  android-internal:
+    name: Android · build
+    instance_type: linux_x2
+    max_build_duration: 60
+    environment:
+      flutter: stable
+    scripts:
+      - name: Flutter packages
+        script: flutter pub get
+      - name: Build APK
+        script: flutter build apk --release
+    artifacts:
+      - build/app/outputs/flutter-apk/*.apk
