@@ -41,7 +41,13 @@ workflows:
       - name: Install CocoaPods
         script: find . -name "Podfile" -execdir pod install \;
       - name: Build signed IPA
-        script: flutter build ipa --release
+        script: |
+          # Auto-bump the build number above whatever is already in TestFlight,
+          # so uploads never collide on a duplicate build number.
+          LATEST=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || echo "0")
+          BUILD_NUMBER=$(( ${LATEST:-0} + 1 ))
+          echo "Using build number $BUILD_NUMBER"
+          flutter build ipa --release --build-number=$BUILD_NUMBER
     artifacts:
       - build/ios/ipa/*.ipa
     publishing:
