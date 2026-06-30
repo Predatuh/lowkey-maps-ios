@@ -53,7 +53,10 @@ workflows:
     publishing:
       app_store_connect:
         auth: integration
-        submit_to_testflight: true
+        # Upload to TestFlight only. Internal testers get it immediately; submit for
+        # external/public Beta App Review manually in App Store Connect (once per version)
+        # to avoid "another build is already in review" failures on every build.
+        submit_to_testflight: false
 
   # Optional: also build the Android side here if you ever want one pipeline.
   android-internal:
