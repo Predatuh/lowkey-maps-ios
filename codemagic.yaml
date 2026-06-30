@@ -1,10 +1,11 @@
 # Codemagic CI/CD — builds Lowkey Maps for iOS in the cloud (no Mac needed) and
 # uploads it to TestFlight.
 #
-# Signing uses Codemagic AUTOMATIC code signing: with the App Store Connect API key
-# integration ("Codemagic") + the ios_signing block below, Codemagic creates and
-# manages the distribution certificate (and its private key) and the provisioning
-# profile for you before each build.
+# Signing: the build uses your App Store Connect API key ("Codemagic" integration)
+# plus a reusable certificate private key stored in the secure env var
+# CERTIFICATE_PRIVATE_KEY. On the first run it CREATES the distribution certificate
+# + provisioning profile; later runs reuse them. (Reusing the same private key means
+# it won't keep making new certificates.)
 
 workflows:
   ios-testflight:
@@ -12,20 +13,28 @@ workflows:
     instance_type: mac_mini_m2
     max_build_duration: 90
     integrations:
-      app_store_connect: Codemagic   # name of the API-key integration (Personal account)
+      app_store_connect: Codemagic   # API-key integration name (Personal account)
     environment:
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: app.lowkeymaps.lowkeyMaps
       flutter: stable
       xcode: latest
       cocoapods: default
       vars:
+        BUNDLE_ID: "app.lowkeymaps.lowkeyMaps"
         APP_STORE_APPLE_ID: 6785916878
     scripts:
       - name: Flutter packages
         script: flutter pub get
-      - name: Set up code signing (automatic)
+      - name: Initialize keychain
+        script: keychain initialize
+      - name: Fetch / create signing files
+        script: |
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --certificate-key="@env:CERTIFICATE_PRIVATE_KEY" \
+            --create
+      - name: Add certificate to keychain
+        script: keychain add-certificates
+      - name: Set up provisioning profiles in Xcode
         script: xcode-project use-profiles
       - name: Install CocoaPods
         script: find . -name "Podfile" -execdir pod install \;
