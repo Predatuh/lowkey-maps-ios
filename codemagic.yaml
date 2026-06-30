@@ -1,11 +1,9 @@
 # Codemagic CI/CD — builds Lowkey Maps for iOS in the cloud (no Mac needed) and
 # uploads it to TestFlight. See README_IOS_TESTFLIGHT.md for the one-time setup.
 #
-# Before the first run, in the Codemagic UI you must add:
-#   1) An App Store Connect API key integration (Teams/Personal → Integrations →
-#      App Store Connect). Note the integration name and put it under
-#      `app_store_connect:` below.
-#   2) Then set BUNDLE_ID / APP_STORE_APPLE_ID vars below.
+# Signing is fully automatic: the "fetch-signing-files --create" step uses your
+# App Store Connect API key (the "Codemagic" integration) to create the
+# distribution certificate + provisioning profile if they don't exist yet.
 
 workflows:
   ios-testflight:
@@ -15,34 +13,37 @@ workflows:
     integrations:
       app_store_connect: Codemagic   # name of the API-key integration in Codemagic
     environment:
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: app.lowkeymaps.lowkeyMaps   # <-- must match your App Store Connect app
       flutter: stable
       xcode: latest
       cocoapods: default
       vars:
-        APP_STORE_APPLE_ID: 6785916878   # <-- numeric "Apple ID" of the app from App Store Connect → App Information
+        BUNDLE_ID: "app.lowkeymaps.lowkeyMaps"
+        APP_STORE_APPLE_ID: 6785916878
     scripts:
       - name: Flutter packages
         script: flutter pub get
-      - name: Set up provisioning (automatic via App Store Connect key)
+      - name: Initialize keychain
+        script: keychain initialize
+      - name: Fetch / create signing files
+        script: |
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --create
+      - name: Add certificates to keychain
+        script: keychain add-certificates
+      - name: Set up provisioning profiles in Xcode
         script: xcode-project use-profiles
       - name: Install CocoaPods
-        script: |
-          find . -name "Podfile" -execdir pod install \;
+        script: find . -name "Podfile" -execdir pod install \;
       - name: Build signed IPA
-        script: |
-          flutter build ipa --release \
-            --export-options-plist=/Users/builder/export_options.plist
+        script: flutter build ipa --release
     artifacts:
       - build/ios/ipa/*.ipa
-      - flutter_drive.log
     publishing:
       app_store_connect:
         auth: integration
         submit_to_testflight: true
-        # Optional: auto-add testers to a TestFlight group you created
+        # Optional: auto-add testers to a TestFlight group you create
         # beta_groups:
         #   - Field Crew
 
