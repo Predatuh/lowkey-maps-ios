@@ -49,5 +49,8 @@
 	     export compliance. This auto-answers the TestFlight encryption question. -->
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<!-- Location: shows the user's position on the jobsite map. -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Lowkey Maps shows your position on the jobsite map and navigates you to on-site equipment.</string>
 </dict>
 </plist>
