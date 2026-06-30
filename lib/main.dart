@@ -1,9 +1,9 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
+
+import 'geo_map.dart';
+import 'map_viewer.dart';
+import 'map_library.dart';
 
 void main() => runApp(const LowkeyMapsApp());
 
@@ -25,186 +25,117 @@ class LowkeyMapsApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      home: const MapScreen(),
+      home: const HomeScreen(),
     );
   }
 }
 
-class MapScreen extends StatefulWidget {
-  const MapScreen({super.key});
+/// Maps stored on this device (work fully offline). The bundled sample proves the
+/// georeferenced-offline rendering; downloaded library maps land here too.
+final List<GeoMap> _myMaps = [
+  const GeoMap(
+    name: 'Sample — Pierce County Solar',
+    image: AssetImage('assets/sample_site.jpg'),
+    tl: LatLng(42.14155644114584, -97.71037989069603),
+    tr: LatLng(42.14155644114584, -97.6192974440341),
+    bl: LatLng(42.10111308259549, -97.71037989069603),
+  ),
+];
 
-  @override
-  State<MapScreen> createState() => _MapScreenState();
-}
-
-class _MapScreenState extends State<MapScreen> {
-  final MapController _map = MapController();
-  StreamSubscription<Position>? _posSub;
-
-  LatLng? _me;
-  double _heading = 0;
-  bool _follow = true;
-  String _status = 'Getting location…';
-
-  static const _accent = Color(0xFFA855F7);
-
-  @override
-  void initState() {
-    super.initState();
-    _startLocation();
-  }
-
-  @override
-  void dispose() {
-    _posSub?.cancel();
-    super.dispose();
-  }
-
-  Future<void> _startLocation() async {
-    if (!await Geolocator.isLocationServiceEnabled()) {
-      setState(() => _status = 'Turn on Location Services');
-      return;
-    }
-    var perm = await Geolocator.checkPermission();
-    if (perm == LocationPermission.denied) {
-      perm = await Geolocator.requestPermission();
-    }
-    if (perm == LocationPermission.denied ||
-        perm == LocationPermission.deniedForever) {
-      setState(() => _status = 'Location permission needed');
-      return;
-    }
-
-    _posSub = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.best,
-        distanceFilter: 1,
-      ),
-    ).listen((pos) {
-      final here = LatLng(pos.latitude, pos.longitude);
-      setState(() {
-        _me = here;
-        if (pos.heading >= 0) _heading = pos.heading;
-        _status = '';
-      });
-      if (_follow) _map.move(here, _map.camera.zoom);
-    });
-  }
-
-  void _recenter() {
-    final me = _me;
-    if (me == null) return;
-    setState(() => _follow = true);
-    _map.move(me, 17);
-  }
+class HomeScreen extends StatelessWidget {
+  const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final me = _me;
     return Scaffold(
-      body: Stack(
-        children: [
-          FlutterMap(
-            mapController: _map,
-            options: MapOptions(
-              initialCenter: me ?? const LatLng(39.8283, -98.5795), // US center until first fix
-              initialZoom: me == null ? 4 : 17,
-              onPointerDown: (_, __) {
-                if (_follow) setState(() => _follow = false);
-              },
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Row(
+              children: const [
+                Text('🗺️', style: TextStyle(fontSize: 30)),
+                SizedBox(width: 10),
+                Text('Lowkey Maps',
+                    style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
+              ],
             ),
-            children: [
-              TileLayer(
-                urlTemplate:
-                    'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'app.lowkeymaps.lowkeyMaps',
-                maxZoom: 19,
-              ),
-              if (me != null)
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      point: me,
-                      width: 30,
-                      height: 30,
-                      child: Transform.rotate(
-                        angle: _heading * 3.1415926 / 180,
-                        child: const _MeDot(),
-                      ),
-                    ),
-                  ],
-                ),
-            ],
-          ),
+            const SizedBox(height: 20),
 
-          // Title pill
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 10,
-            left: 12,
-            child: _pill('Lowkey Maps'),
-          ),
+            // ── Map Library (online) ───────────────────────────────────
+            _SectionHeader('Map Library'),
+            _LibraryCard(onTap: () {
+              Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const MapLibraryScreen()));
+            }),
+            const SizedBox(height: 20),
 
-          // Status / hint
-          if (_status.isNotEmpty)
-            Positioned(
-              top: MediaQuery.of(context).padding.top + 56,
-              left: 12,
-              child: _pill(_status),
-            ),
-        ],
-      ),
-      floatingActionButton: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          FloatingActionButton.small(
-            heroTag: 'zin',
-            backgroundColor: const Color(0xFF1A1A28),
-            onPressed: () => _map.move(_map.camera.center, _map.camera.zoom + 1),
-            child: const Icon(Icons.add, color: Colors.white),
-          ),
-          const SizedBox(height: 8),
-          FloatingActionButton.small(
-            heroTag: 'zout',
-            backgroundColor: const Color(0xFF1A1A28),
-            onPressed: () => _map.move(_map.camera.center, _map.camera.zoom - 1),
-            child: const Icon(Icons.remove, color: Colors.white),
-          ),
-          const SizedBox(height: 8),
-          FloatingActionButton(
-            heroTag: 'loc',
-            backgroundColor: _follow ? _accent : const Color(0xFF1A1A28),
-            onPressed: _recenter,
-            child: Icon(_follow ? Icons.my_location : Icons.location_searching,
-                color: Colors.white),
-          ),
-        ],
+            // ── My maps (offline, on this device) ──────────────────────
+            _SectionHeader('My Maps'),
+            ..._myMaps.map((m) => _MapCard(
+                  map: m,
+                  onTap: () => Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => MapViewer(map: m))),
+                )),
+          ],
+        ),
       ),
     );
   }
+}
 
-  Widget _pill(String text) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: const Color(0xE6111120),
-          borderRadius: BorderRadius.circular(20),
-        ),
+class _SectionHeader extends StatelessWidget {
+  final String text;
+  const _SectionHeader(this.text);
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 8, top: 4),
         child: Text(text,
             style: const TextStyle(
-                color: Colors.white, fontWeight: FontWeight.bold)),
+                fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF8888AA))),
       );
 }
 
-class _MeDot extends StatelessWidget {
-  const _MeDot();
+class _MapCard extends StatelessWidget {
+  final GeoMap map;
+  final VoidCallback onTap;
+  const _MapCard({required this.map, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E88E5),
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 3),
-        boxShadow: const [BoxShadow(color: Color(0x551E88E5), blurRadius: 12, spreadRadius: 4)],
+    return Card(
+      color: const Color(0xFF111120),
+      margin: const EdgeInsets.only(bottom: 10),
+      child: ListTile(
+        leading: const Icon(Icons.map, color: Color(0xFFA855F7)),
+        title: Text(map.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text(
+            '${map.center.latitude.toStringAsFixed(4)}, ${map.center.longitude.toStringAsFixed(4)}  ·  offline',
+            style: const TextStyle(color: Color(0xFF8888AA))),
+        trailing: const Icon(Icons.chevron_right, color: Color(0xFFA855F7)),
+        onTap: onTap,
+      ),
+    );
+  }
+}
+
+class _LibraryCard extends StatelessWidget {
+  final VoidCallback onTap;
+  const _LibraryCard({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      color: const Color(0xFF1A1330),
+      margin: const EdgeInsets.only(bottom: 10),
+      child: ListTile(
+        leading: const Icon(Icons.cloud_download, color: Color(0xFF22D3EE)),
+        title: const Text('Browse the online library',
+            style: TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: const Text('Search & download jobsite maps near you · upload your own',
+            style: TextStyle(color: Color(0xFF8888AA))),
+        trailing: const Icon(Icons.chevron_right, color: Color(0xFF22D3EE)),
+        onTap: onTap,
       ),
     );
   }
