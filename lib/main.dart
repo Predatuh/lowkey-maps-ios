@@ -33,12 +33,14 @@ class LowkeyMapsApp extends StatelessWidget {
 /// Maps stored on this device (work fully offline). The bundled sample proves the
 /// georeferenced-offline rendering; downloaded library maps land here too.
 final List<GeoMap> _myMaps = [
-  const GeoMap(
+  GeoMap(
     name: 'Sample — Pierce County Solar',
-    image: AssetImage('assets/sample_site.jpg'),
-    tl: LatLng(42.14155644114584, -97.71037989069603),
-    tr: LatLng(42.14155644114584, -97.6192974440341),
-    bl: LatLng(42.10111308259549, -97.71037989069603),
+    // Cap decode resolution: the source is 8490×5082; full-size would exceed memory/
+    // GPU texture limits. (Large real maps will need tiling — see roadmap.)
+    image: const ResizeImage(AssetImage('assets/sample_site.jpg'), width: 2400),
+    tl: const LatLng(42.14155644114584, -97.71037989069603),
+    tr: const LatLng(42.14155644114584, -97.6192974440341),
+    bl: const LatLng(42.10111308259549, -97.71037989069603),
   ),
 ];
 
